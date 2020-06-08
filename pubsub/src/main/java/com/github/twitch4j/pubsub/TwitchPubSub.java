@@ -15,6 +15,13 @@ import com.github.twitch4j.pubsub.domain.ChannelBitsData;
 import com.github.twitch4j.pubsub.domain.ChannelPointsRedemption;
 import com.github.twitch4j.pubsub.domain.CommerceData;
 import com.github.twitch4j.pubsub.domain.ChatModerationAction;
+import com.github.twitch4j.pubsub.domain.ChannelPointsEarned;
+import com.github.twitch4j.pubsub.domain.ChannelPointsRedemption;
+import com.github.twitch4j.pubsub.domain.HypeLevelUp;
+import com.github.twitch4j.pubsub.domain.HypeProgression;
+import com.github.twitch4j.pubsub.domain.HypeTrainConductor;
+import com.github.twitch4j.pubsub.domain.HypeTrainEnd;
+import com.github.twitch4j.pubsub.domain.HypeTrainStart;
 import com.github.twitch4j.pubsub.domain.PubSubRequest;
 import com.github.twitch4j.pubsub.domain.PubSubResponse;
 import com.github.twitch4j.pubsub.domain.SubscriptionData;
@@ -26,6 +33,12 @@ import com.github.twitch4j.pubsub.events.ChannelCommerceEvent;
 import com.github.twitch4j.pubsub.events.ChannelPointsRedemptionEvent;
 import com.github.twitch4j.pubsub.events.ChannelSubscribeEvent;
 import com.github.twitch4j.pubsub.events.ChatModerationEvent;
+import com.github.twitch4j.pubsub.events.ChannelPointsUserEvent;
+import com.github.twitch4j.pubsub.events.HypeTrainConductorUpdateEvent;
+import com.github.twitch4j.pubsub.events.HypeTrainEndEvent;
+import com.github.twitch4j.pubsub.events.HypeTrainLevelUpEvent;
+import com.github.twitch4j.pubsub.events.HypeTrainProgressionEvent;
+import com.github.twitch4j.pubsub.events.HypeTrainStartEvent;
 import com.github.twitch4j.pubsub.events.RedemptionStatusUpdateEvent;
 import com.github.twitch4j.pubsub.events.RewardRedeemedEvent;
 import com.neovisionaries.ws.client.WebSocket;
@@ -307,16 +320,77 @@ public class TwitchPubSub implements AutoCloseable {
                                 );
                                 ChannelPointsRedemption redemption = TypeConvert.convertValue(msgData.path("redemption"), ChannelPointsRedemption.class);
 
-                                switch(type) {
-                                    case "reward-redeemed": eventManager.publish(new RewardRedeemedEvent(timestamp, redemption)); break;
-                                    case "redemption-status-update": eventManager.publish(new RedemptionStatusUpdateEvent(timestamp, redemption)); break;
-                                    default: eventManager.publish(new ChannelPointsRedemptionEvent(timestamp, redemption));
+                                switch (type) {
+                                    case "reward-redeemed":
+                                        eventManager.publish(new RewardRedeemedEvent(timestamp, redemption));
+                                        break;
+                                    case "redemption-status-update":
+                                        eventManager.publish(new RedemptionStatusUpdateEvent(timestamp, redemption));
+                                        break;
+                                    case "custom-reward-created":
+                                        // todo
+                                    case "custom-reward-updated":
+                                        // todo
+                                    case "custom-reward-deleted":
+                                        // todo
+                                    case "update-redemption-statuses-progress":
+                                        // todo
+                                    case "update-redemption-statuses-finished":
+                                        // todo
+                                    default:
+                                        eventManager.publish(new ChannelPointsRedemptionEvent(timestamp, redemption));
                                 }
-
                             } else if (topic.startsWith("chat_moderator_actions")) {
                                 String channelId = topic.substring(topic.lastIndexOf('.') + 1);
                                 ChatModerationAction data = TypeConvert.convertValue(msgData, ChatModerationAction.class);
                                 eventManager.publish(new ChatModerationEvent(channelId, data));
+                            } else if (topic.startsWith("raid")) {
+                                switch (type) {
+                                    case "raid_go_v2":
+                                        // todo
+                                    case "raid_update_v2":
+                                        // todo
+                                    default:
+                                        log.warn("Unparseable Message: " + message.getType() + "|" + message.getData());
+                                        break;
+                                }
+                            } else if (topic.startsWith("following")) {
+                                final String channelId = topic.substring(topic.lastIndexOf('.') + 1);
+                                // todo
+                            } else if (topic.startsWith("hype-train-events-v1")) {
+                                final String channelId = topic.substring(topic.lastIndexOf('.') + 1);
+                                switch (type) {
+                                    case "hype-train-start":
+                                        final HypeTrainStart startData = TypeConvert.convertValue(msgData, HypeTrainStart.class);
+                                        eventManager.publish(new HypeTrainStartEvent(startData));
+                                        break;
+                                    case "hype-train-progression":
+                                        final HypeProgression progressionData = TypeConvert.convertValue(msgData, HypeProgression.class);
+                                        eventManager.publish(new HypeTrainProgressionEvent(channelId, progressionData));
+                                        break;
+                                    case "hype-train-level-up":
+                                        final HypeLevelUp levelUpData = TypeConvert.convertValue(msgData, HypeLevelUp.class);
+                                        eventManager.publish(new HypeTrainLevelUpEvent(channelId, levelUpData));
+                                        break;
+                                    case "hype-train-end":
+                                        final HypeTrainEnd endData = TypeConvert.convertValue(msgData, HypeTrainEnd.class);
+                                        eventManager.publish(new HypeTrainEndEvent(channelId, endData));
+                                        break;
+                                    case "hype-train-conductor-update":
+                                        final HypeTrainConductor conductorData = TypeConvert.convertValue(msgData, HypeTrainConductor.class);
+                                        eventManager.publish(new HypeTrainConductorUpdateEvent(channelId, conductorData));
+                                        break;
+                                    default:
+                                        log.warn("Unparseable Message: " + message.getType() + "|" + message.getData());
+                                        break;
+                                }
+                            } else if (topic.startsWith("community-points-user-v1")) {
+                                if (type.equalsIgnoreCase("points-earned")) {
+                                    final ChannelPointsEarned data = TypeConvert.convertValue(msgData, ChannelPointsEarned.class);
+                                    eventManager.publish(new ChannelPointsUserEvent(data));
+                                } else {
+                                    log.warn("Unparseable Message: " + message.getType() + "|" + message.getData());
+                                }
                             } else {
                                 log.warn("Unparseable Message: " + message.getType() + "|" + message.getData());
                             }
@@ -565,6 +639,325 @@ public class TwitchPubSub implements AutoCloseable {
         request.setNonce(UUID.randomUUID().toString());
         request.getData().put("auth_token", credential.getAccessToken());
         request.getData().put("topics", Collections.singletonList("community-points-channel-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    /*
+     * Undocumented topics - Use at your own risk
+     */
+
+    @Deprecated
+    public PubSubSubscription listenForAdsEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("ads." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForBountyBoardEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-bounty-board-events.cta." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForDashboardActivityFeedEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("dashboard-activity-feed." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForUserChannelPointsEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("community-points-user-v1." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelDropEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-drop-events." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelBitsLeaderboardEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("leaderboard-events-v1.bits-usage-by-channel-v1-" + channelId + "-WEEK"));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelSubLeaderboardEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("leaderboard-events-v1.sub-gift-sent-" + channelId + "-WEEK"));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelSubGiftsEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-sub-gifts-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelSquadEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-squad-updates." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForRaidEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("raid." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelExtensionEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-ext-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForExtensionControlEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("extension-control." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForHypeTrainEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("hype-train-events-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForBroadcastSettingUpdateEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("broadcast-settings-update." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForCelebrationEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("celebration-events-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForPublicCheerEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("channel-cheer-events-public-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForStreamChangeEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("stream-change-by-channel." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForStreamChatRoomEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("stream-chat-room-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForChannelChatroomEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("chatrooms-channel-v1." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForUserChatroomEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("chatrooms-user-v1." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForUserBitsUpdateEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("user-bits-updates-v1." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForUserImageUpdateEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("user-image-update." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    /**
+     * Event Listener: Anyone follows the specified channel.
+     *
+     * @param credential {@link OAuth2Credential}
+     * @param channelId the id for the channel
+     * @return PubSubSubscription
+     */
+    @Deprecated
+    public PubSubSubscription listenForFollowingEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("following." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForFriendshipEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("friendship." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForPollEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("polls." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForPresenceEvents(OAuth2Credential credential, String userId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("presence." + userId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForVideoPlaybackEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("video-playback." + channelId));
+
+        return listenOnTopic(request);
+    }
+
+    @Deprecated
+    public PubSubSubscription listenForWatchPartyEvents(OAuth2Credential credential, String channelId) {
+        PubSubRequest request = new PubSubRequest();
+        request.setType(PubSubType.LISTEN);
+        request.setNonce(UUID.randomUUID().toString());
+        request.getData().put("auth_token", credential.getAccessToken());
+        request.getData().put("topics", Collections.singletonList("pv-watch-party-events." + channelId));
 
         return listenOnTopic(request);
     }
